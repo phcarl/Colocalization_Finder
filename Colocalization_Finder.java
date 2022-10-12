@@ -158,8 +158,8 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			int								[]	wList;
 			String								str;
 			int									scatterPlotSizeIndex;
-			String							[]	scatterPlotSizeText		= {"  256 x 256", "  512 x 512", "1024 x 1024"};
-//			String							[]	scatterPlotSizeText		= {"  256 \u00D7 256", "  512 \u00D7 512", "1024 \u00D7 1024"};
+			String							[]	scatterPlotSizeText		= {"_256 x 256_", "_512 x 512_", "1024 x 1024"};
+//			String							[]	scatterPlotSizeText		= {"_256 \u00D7 256_", "_512 \u00D7 512_", "1024 \u00D7 1024"};
 			Button								set;
 			Checkbox						[]	checkboxes;
 			Component						[]	dlgItems;
@@ -469,12 +469,13 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		image1Processor			= image1.getProcessor();
 		image2Processor			= image2.getProcessor();
 		scatterPlotProcessor	= scatterPlot.getProcessor();
+
 		for (y = 0; y < h1; y++)
 		{
 			for (x = 0; x < w1; x++)
 			{
-				z1				=                   (int) (image1Processor     .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax1);
-				z2				= scatterPlotSize - (int) (image2Processor     .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax2);
+				z1				=                   (int) (image1Processor    .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax1);
+				z2				= scatterPlotSize - (int) (image2Processor    .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax2);
 				count			=                   (int) scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
 				count++;
 				scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
@@ -512,11 +513,14 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			{
 				for (x = 0; x < w1; x++)
 				{
-					z1				=                   (int) (image1Processor    .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax1);
-					z2				= scatterPlotSize - (int) (image2Processor    .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax2);
-					count			=                   (int) scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
-					count++;
-					scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
+					if(image1Processor.getPixelValue(x, y) > scatterPlotMin1 && image2Processor.getPixelValue(x, y) > scatterPlotMin2)
+					{
+						z1				=                   (int) ((    image1Processor.getPixelValue(x, y) - scatterPlotMin1) * scatterPlotSize / (scatterPlotMax1 - scatterPlotMin1));
+						z2				= scatterPlotSize - (int) ((    image2Processor.getPixelValue(x, y) - scatterPlotMin2) * scatterPlotSize / (scatterPlotMax2 - scatterPlotMin2));
+						count			=                   (int)  scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
+						count++;
+						scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
+					}
 				}
 			}
 		}
@@ -528,11 +532,14 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			{
 				if(pointsInsideRoi[i].x >= 0 && pointsInsideRoi[i].x < w1 && pointsInsideRoi[i].y >= 0 && pointsInsideRoi[i].y < h1)
 				{
-					z1				=                   (int) (image1Processor    .getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / scatterPlotMax1);
-					z2				= scatterPlotSize - (int) (image2Processor    .getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / scatterPlotMax1);
-					count			=                   (int) scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
-					count++;
-					scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
+					if(image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) > scatterPlotMin1 && image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) > scatterPlotMin2)
+					{
+						z1				=                   (int) (((   image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y)) - scatterPlotMin1) * scatterPlotSize / (scatterPlotMax1 - scatterPlotMin1));
+						z2				= scatterPlotSize - (int) (((   image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y)) - scatterPlotMin2) * scatterPlotSize / (scatterPlotMax2 - scatterPlotMin2));
+						count			=                   (int)  scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
+						count++;
+						scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
+					}
 				}
 			}
 		}
@@ -883,8 +890,9 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			resultImageOverlay	= new Overlay();
 			resultImageOverlay	.addElement(colocMaskRoi);
 		}
-		else
-			resultImageOverlay	.set(colocMaskRoi, resultImageOverlay.size() - 1);
+		else 
+			resultImageOverlay	.set(colocMaskRoi, 0);
+//			resultImageOverlay	.set(colocMaskRoi, resultImageOverlay.size() - 1);		Generated some bugs thus replaced the 'resultImageOverlay.size() - 1' by '0'
 		resultImage				.setOverlay(resultImageOverlay);
 
 		percentPixels = ((double) counter / (w1 * h1)) * 100.0;
@@ -1493,7 +1501,6 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			scatterPlotMin2			= minI2					= min2;
 			scatterPlotMax2			= maxI2					= max2;
 		}
-
 		scatterPlotProcessor		.setColor(Color.black);
 		scatterPlotProcessor		.resetRoi();
 		scatterPlotProcessor		.fill();
