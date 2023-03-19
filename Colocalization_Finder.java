@@ -17,41 +17,45 @@
  * code were taken from Wayne Rasband, Pierre Bourdoncle.
  * and Gary Chinga.
  * 
- * version 1.2 : JM
- * - rewrote the mask overlay part, now faster
- * - made the scatterplot selection possible with any kind of closed selections after several requests.
- * - the ratio bars are now overlaid on a separte layer, so that you stillcan read the pixel info behind these bars
+ * Version 1.2 : JM
+ * - Rewrote the mask overlay part, now faster
+ * - Made the scatterplot selection possible with any kind of closed selections after several requests.
+ * - The ratio bars are now overlaid on a separte layer, so that you stillcan read the pixel info behind these bars
  * - Fixed the Fire LUT issue (LUT was not always applied) 
  *  
- * version 1.3 : Philippe Carl
+ * Version 1.3 : Philippe Carl
  * Email       : philippe.carl at unistra.fr
  * Date        : 4/30/2016
- * - replacement of the deprecated functions (getBoundingRect, IJ.write) by the new ones
- * - extension of the plugin for whatever picture dynamics
- * - addition of a plot (with legends, ticks (minor and major), labels) within the scatter plot
- * - the selected points within the overlay picture are updated as soon as the ROI in the scatter plot is modified or dragged over
- * - possibility to move the ROI position (within the scatter plot) from the mouse position within the overlay picture
- * - possibility to set ROIs with given colors with a mouse double click
- * - possibility to generate the x or y histogram with a Gaussian fit in order to extract the histogram maximum position by using the numeric pad 4/6 or 2/8 keys
+ * - Replacement of the deprecated functions (getBoundingRect, IJ.write) by the new ones
+ * - Extension of the plugin for whatever picture dynamics
+ * - Addition of a plot (with legends, ticks (minor and major), labels) within the scatter plot
+ * - The selected points within the overlay picture are updated as soon as the ROI in the scatter plot is modified or dragged over
+ * - Possibility to move the ROI position (within the scatter plot) from the mouse position within the overlay picture
+ * - Possibility to set ROIs with given colors with a mouse double click
+ * - Possibility to generate the x or y histogram with a Gaussian fit in order to extract the histogram maximum position by using the numeric pad 4/6 or 2/8 keys
  *  
- * version 1.4 : Philippe Carl
+ * Version 1.4 : Philippe Carl
  * Date        : 10/20/2019
  * - Addition of scripting possibilities through plugin or macro programming
  * - The colocalization calculations are performed using double parameters instead of float
  * - Possibility to reduce the analysis to a ROI within the composite picture
  * 
- * version 1.5: Philippe Carl
+ * Version 1.5: Philippe Carl
  * Date       : 12/15/2019
- * - possibility to add a selection within the Composite picture to restric the analysis a the given selection
- * - addition of synchronized background thread for smoothly updating the calculations on the fly
+ * - Possibility to add a selection within the Composite picture to restric the analysis a the given selection
+ * - Addition of synchronized background thread for smoothly updating the calculations on the fly
  * 
- * version 1.6: Philippe Carl
+ * Version 1.6: Philippe Carl
  * Date       : 06/12/2022
- * - possibility to choose the size of the scatter plot upon start of the plugin
- * - addition of a label panel at the bottom of the scatterPlot picture displaying the limits of the scatterPlot Roi selection (or other parameters upon selection)
- * - addition of a "Set" button at the bottom left of the scatterPlot picture allowing so set the limits of the scatterPlot graph and/or of the scatterPlot Roi  and/or choosing the displayed parameters within the label panel at the bottom of the scatterPlot (the 'g' key gives the same features)
- * - addition of the Manders coefficients (M1, M2 and M1_norm, M2_norm) calculation 
- * - the possibility to set ROIs with given colors with a mouse double click has been erased (due to the ImageJ 1.53c 26 June 2020 update) and replaced by a Ctrl + mouse click user action
+ * - Possibility to choose the size of the scatter plot upon start of the plugin
+ * - Addition of a label panel at the bottom of the scatterPlot picture displaying the limits of the scatterPlot Roi selection (or other parameters upon selection)
+ * - Addition of a "Set" button at the bottom left of the scatterPlot picture allowing so set the limits of the scatterPlot graph and/or of the scatterPlot Roi  and/or choosing the displayed parameters within the label panel at the bottom of the scatterPlot (the 'g' key gives the same features)
+ * - Addition of the Manders coefficients (M1, M2 and M1_norm, M2_norm) calculation 
+ * - The possibility to set ROIs with given colors with a mouse double click has been erased (due to the ImageJ 1.53c 26 June 2020 update) and replaced by a Ctrl + mouse click user action
+ * 
+ * Version 1.7: Philippe Carl
+ * Date       : 18/03/2023
+ * - Addition of a ScatterPlot_ROI_name column within the Colocalization Finder Results window
  * 
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -175,6 +179,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 	static	Overlay								                                   scatterplotOverlay       , resultImageOverlay;
 	static	CurveFitter							cf;
 	static	TextWindow							ResultsWindow;
+	static	String																							  resultImageRoiName;
 	static	     Roi							colocMaskRoi,                      scatterPlotRoi           , resultImageRoi;
 	static	ShapeRoi							sr1, sr2;
 	static	RoiManager							rm;
@@ -311,7 +316,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		if (!showDialog())
 			return;
 
-		ResultsHeadings = "picture1_name\tpicture2_name\tPearson's_Rr\tAverage_a\tAverage_b\tSigma_a\tSigma_b\tOverlap_R\tk1\tk2\tM1\tM2\tM1_norm\tM2_norm\tSlope\tIntercept\tnb_pixels\t%pixels\tmin_I1\tmax_I1\tmin_I2\tmax_I2\t<picture1>\t<picture2>\tROI_color";
+		ResultsHeadings = "picture1_name\tpicture2_name\tScatterPlot_ROI_name\tPearson's_Rr\tAverage_a\tAverage_b\tSigma_a\tSigma_b\tOverlap_R\tk1\tk2\tM1\tM2\tM1_norm\tM2_norm\tSlope\tIntercept\tnb_pixels\t%pixels\tmin_I1\tmax_I1\tmin_I2\tmax_I2\t<picture1>\t<picture2>\tROI_color";
 		defineColors();
 
 		build_scatter_plot();
@@ -430,6 +435,15 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		maskPixels				= new byte[w1 * h1];
 		Arrays					.fill								(maskPixels, (byte) 0);
 
+		if(titles[i1Index].lastIndexOf(".") > 0)
+			resultImage			.getImageStack().setSliceLabel		(titles[i1Index].substring(0, titles[i1Index].lastIndexOf("."))	, 1);
+		else
+			resultImage			.getImageStack().setSliceLabel		(titles[i1Index]													, 1);
+		if(titles[i2Index].lastIndexOf(".") > 0)
+			resultImage			.getImageStack().setSliceLabel		(titles[i2Index].substring(0, titles[i2Index].lastIndexOf("."))	, 2);
+		else
+			resultImage			.getImageStack().setSliceLabel		(titles[i2Index]													, 2);
+
 		windowOffset			= 80;
 		scatterPlot				= new ImagePlus						("ScatterPlot", new ByteProcessor (scatterPlotSize + windowOffset, scatterPlotSize + windowOffset));
 		scatterPlot				.addImageListener					(this);
@@ -488,7 +502,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		scatterPlotRoi			.addRoiListener(this);
 //		resultImageRoi			= resultImage.getRoi();
 //		resultImageRoi			.addRoiListener(this);
-		
+
 		build_plot_for_scatter_plot();
 	}
 
@@ -562,7 +576,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		int 		i;
 		String 		output;
 		String	[]	outputs;
-		
+
 		rebuild_scatter_plot();
 		output = comparison(_write_results, _set_roi);
 
@@ -603,6 +617,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 	// call("Colocalization_Finder.getResultsLinesCount");
 	public static String getResultsLinesCount()
 	{
+		ResultsWindow = (TextWindow) WindowManager.getWindow(ResultsTitle);
 		if(ResultsWindow == null)
 			return String.valueOf(0);
 		return String.valueOf(ResultsWindow.getTextPanel().getLineCount());
@@ -901,7 +916,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		cfParams = cf.getParams();
 
 		String	output			= set_roi ? getResultsAsString(";") + ";" + colors[color].name : getResultsAsString(";");
-//		if (write_results && IJ.getToolName() != "polygon")
+//		if (write_results &&  IJ.getToolName() != "polygon")
 //		if (write_results && (IJ.getToolName() == "rectangle" || IJ.getToolName() == "roundrect" || IJ.getToolName() == "rotrect" || IJ.getToolName() == "oval" || IJ.getToolName() == "ellipse" || IJ.getToolName() == "brush" || IJ.getToolName() == "freehand" || IJ.getToolName() == "polygon"))
 		if (write_results && Toolbar.getInstance().getToolId() < 4)
 		{
@@ -914,7 +929,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			ResultsWindow.append(output.replace(";", "\t"));
 		}
 
-//		if (set_roi && IJ.getToolName() != "polygon")
+//		if (set_roi &&  IJ.getToolName() != "polygon")
 //		if (set_roi && (IJ.getToolName() == "rectangle" || IJ.getToolName() == "roundrect" || IJ.getToolName() == "rotrect" || IJ.getToolName() == "oval" || IJ.getToolName() == "ellipse" || IJ.getToolName() == "brush" || IJ.getToolName() == "freehand" || IJ.getToolName() == "polygon"))
 		if (set_roi && Toolbar.getInstance().getToolId() < 4)
 		{
@@ -1501,6 +1516,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			scatterPlotMin2			= minI2					= min2;
 			scatterPlotMax2			= maxI2					= max2;
 		}
+
 		scatterPlotProcessor		.setColor(Color.black);
 		scatterPlotProcessor		.resetRoi();
 		scatterPlotProcessor		.fill();
@@ -1859,15 +1875,18 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 
 	public static String getResultsAsString(String separator)
 	{
-		PearsonValue			= getR(lesx, lesy);
-		PearsonValueAsString	= Math.abs(PearsonValue) < 1e-3 ? String.format("%.7E", PearsonValue) : IJ.d2s(PearsonValue, 8);
+		PearsonValue			= Double.isNaN(getR(lesx, lesy))			? 0										: getR(lesx, lesy);
+		PearsonValueAsString	= Math.abs(PearsonValue) < 1e-3				? String.format("%.7E", PearsonValue)	: IJ.d2s(PearsonValue, 8);
+		if (resultImage.getRoi() == null)
+			resultImageRoiName	= "-";
+		else if (resultImage.getRoi().getName()	== null)
+			resultImageRoiName	= "-";
+		else
+			resultImageRoiName	= resultImage.getRoi().getName();
 
-		return	 (titles[i1Index].lastIndexOf(".tif") > 0
-				? titles[i1Index].substring(0, titles[i1Index].lastIndexOf(".tif"))			+ separator
-				: titles[i1Index]															+ separator)
-				+(titles[i2Index].lastIndexOf(".tif") > 0
-				? titles[i2Index].substring(0, titles[i2Index].lastIndexOf(".tif"))			+ separator
-				: titles[i2Index]															+ separator)
+		return	  resultImage			.getImageStack().getSliceLabel(1)					+ separator
+				+ resultImage			.getImageStack().getSliceLabel(2)					+ separator
+				+ resultImageRoiName														+ separator
 				+ PearsonValueAsString														+ separator
 				+ IJ.d2s			(	xMean										, 8	)	+ separator
 				+ IJ.d2s			(	yMean										, 8	)	+ separator
@@ -1897,18 +1916,22 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		String	aboutMessage = 	"Colocalization_finder\n\n" +
 								"Required version:\tImageJ 1.52p01 or higher\n" +
 								"Runing    version:\tImageJ " + IJ.getFullVersion() + "\n\n" +
+								"Version 1.7\n" +
+								"\tAuthor\t: Philippe Carl\n" +
+								"\tEmail\t: philippe.carl at unistra dot fr\n" +
+								"\tDate\t: 18/03/2023\n\n" +
+								"\t- Addition of a ScatterPlot_ROI_name column within the Colocalization Finder Results window\n\n" +
 								"Version 1.6\n" +
 								"\tAuthor\t: Philippe Carl\n" +
-								"\tEmail\t: philippe.carl at unistra.fr\n" +
 								"\tDate\t: 06/12/2022\n\n" +
-								"\t- possibility to choose the size of the scatter plot upon start of the plugin\n" +
-								"\t- addition of a label panel at the bottom of the scatterPlot picture displaying the limits of the scatterPlot\n" +
+								"\t- Possibility to choose the size of the scatter plot upon start of the plugin\n" +
+								"\t- Addition of a label panel at the bottom of the scatterPlot picture displaying the limits of the scatterPlot\n" +
 								"\t  Roi selection (or other parameters upon selection)\n" +
-								"\t- addition of a \"Set\" button at the bottom left of the scatterPlot picture allowing so set the limits of the\n" +
+								"\t- Addition of a \"Set\" button at the bottom left of the scatterPlot picture allowing so set the limits of the\n" +
 								"\t  scatterPlot graph and/or of the scatterPlot Roi  and/or choosing the displayed parameters within the\n" +
 								"\t  label panel at the bottom of the scatterPlot (the 'g' key gives the same features)\n" +
-								"\t- addition of the Manders coefficients (M1, M2 and M1_norm, M2_norm) calculation\n" +
-								"\t- the possibility to set ROIs with given colors with a mouse double click has been erased (due to the\n" +
+								"\t- Addition of the Manders coefficients (M1, M2 and M1_norm, M2_norm) calculation\n" +
+								"\t- The possibility to set ROIs with given colors with a mouse double click has been erased (due to the\n" +
 								"\t  ImageJ 1.53c 26 June 2020 update) and replaced by a Ctrl + mouse click user action\n\n" +
 								"Version 1.5\n" +
 								"\tAuthor\t: Philippe Carl\n" +
