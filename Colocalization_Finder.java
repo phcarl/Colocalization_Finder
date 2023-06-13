@@ -57,6 +57,10 @@
  * Date       : 18/03/2023
  * - Addition of a ScatterPlot_ROI_name column within the Colocalization Finder Results window
  * 
+ * Version 1.8: Philippe Carl
+ * Date       : 01/05/2023
+ * - The Colocalization_Finder plugin allows the analysis of image stacks
+ * 
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
  *   the Free Software Foundation; either version 2 of the License, or
@@ -150,7 +154,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			Timer								timer;
 			ImageCanvas							canvas, canvasResu, ccr, cc3, icc;
 			ImageConverter						image1Converter , image2Converter;
-			ImagePlus							image1          , image2         ,                         imp                  , insertImp, insertImp2, insertImp3;
+			ImagePlus							                                                           imp                  , insertImp, insertImp2, insertImp3;
 			ImageStatistics						image1Statistics, image2Statistics;
 			boolean								previousblackBackgroundState;
 			boolean								mouseInsideResultImage	= false;
@@ -171,7 +175,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 	static	Image								icon					= null;
 	static	Colocalization_Finder				instance;
 	static	GenericDialog						gd;
-	static	ImagePlus															   scatterPlot             , resultImage;
+	static	ImagePlus							image1          , image2         , scatterPlot             , resultImage;
 	static	ImageProcessor						image1Processor , image2Processor, scatterPlotProcessor;
 	static	ImageProcessor						mask, colocMask;
 	static	ImageWindow			   				                                   scatterPlotWindow;
@@ -187,10 +191,11 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 	static	Label								statusLabel;
 	static	String								title        = "Colocalization Finder";
 	static	String								ResultsTitle = "Colocalization Finder Results";
-	static	String								ResultsHeadings, spaceString;
+	static	String								ResultsHeadings, spaceString, sstr;
 	static	boolean								pearson					= true;
 	static	boolean								comparisonRunning		= false;
 //	static	boolean								doubleClick;
+	static	int																								  resultImageSliceNumbers, resultImageSlicePosition;
 	static	final int							show_Pearson			= 0x1;
 	static	final int							show_Overlap			= 0x2;
 	static	final int							show_k1					= 0x4;
@@ -316,7 +321,9 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		if (!showDialog())
 			return;
 
-		ResultsHeadings = "picture1_name\tpicture2_name\tScatterPlot_ROI_name\tPearson's_Rr\tAverage_a\tAverage_b\tSigma_a\tSigma_b\tOverlap_R\tk1\tk2\tM1\tM2\tM1_norm\tM2_norm\tSlope\tIntercept\tnb_pixels\t%pixels\tmin_I1\tmax_I1\tmin_I2\tmax_I2\t<picture1>\t<picture2>\tROI_color";
+		ResultsHeadings =	resultImageSliceNumbers > 1 ?
+							"picture1_name\tpicture2_name\tSlice_number\tROI_name\tPearson's_Rr\tAverage_a\tAverage_b\tSigma_a\tSigma_b\tOverlap_R\tk1\tk2\tM1\tM2\tM1_norm\tM2_norm\tSlope\tIntercept\tnb_pixels\t%pixels\tmin_I1\tmax_I1\tmin_I2\tmax_I2\t<picture1>\t<picture2>\tROI_color" :
+							"picture1_name\tpicture2_name\tROI_name\tPearson's_Rr\tAverage_a\tAverage_b\tSigma_a\tSigma_b\tOverlap_R\tk1\tk2\tM1\tM2\tM1_norm\tM2_norm\tSlope\tIntercept\tnb_pixels\t%pixels\tmin_I1\tmax_I1\tmin_I2\tmax_I2\t<picture1>\t<picture2>\tROI_color";
 		defineColors();
 
 		build_scatter_plot();
@@ -431,6 +438,8 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		resultImage				.getWindow().setIconImage			(icon);
 		resultImage				.getCanvas().addMouseListener		(this);
 		resultImage				.getCanvas().addMouseMotionListener	(this);
+		resultImageSliceNumbers	= resultImage.getNSlices			();
+		resultImageSlicePosition= resultImage.getSlice				();
 
 		maskPixels				= new byte[w1 * h1];
 		Arrays					.fill								(maskPixels, (byte) 0);
@@ -445,12 +454,12 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			resultImage			.getImageStack().setSliceLabel		(titles[i2Index]													, 2);
 
 		windowOffset			= 80;
+		ImagePlus				.addImageListener					(this);
 		scatterPlot				= new ImagePlus						("ScatterPlot", new ByteProcessor (scatterPlotSize + windowOffset, scatterPlotSize + windowOffset));
-		scatterPlot				.addImageListener					(this);
 
 		scatterPlot				.show								();
 		scatterPlotWindow		= scatterPlot.getWindow				();
-		scatterPlotWindow		.addKeyListener     	    		(this);
+		scatterPlotWindow		.addKeyListener						(this);
 		scatterPlotWindow		.setIconImage						(icon);
 		canvas					= scatterPlotWindow.getCanvas		();
 		canvas					.addKeyListener						(this);
@@ -495,13 +504,12 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 				scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
 			}
 		}
+		Roi						.addRoiListener(this);
 //		scatterPlot				.setRoi(new Roi(xOffset + scatterPlotSize + 1 - 150, yOffset, 150, 150));
 		scatterPlot				.setRoi(new Roi(xOffset, yOffset, scatterPlotSize + 1, scatterPlotSize + 1));
 //		scatterPlot				.setRoi(new Roi(xOffset + 20, yOffset, 237, 237));
 		scatterPlotRoi			= scatterPlot.getRoi();
-		scatterPlotRoi			.addRoiListener(this);
 //		resultImageRoi			= resultImage.getRoi();
-//		resultImageRoi			.addRoiListener(this);
 
 		build_plot_for_scatter_plot();
 	}
@@ -539,7 +547,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			}
 		}
 		else
-		{	// There a no ROI within the result image, thus I make the analysis only within the ROI elements
+		{	// There is no ROI within the result image, thus I make the analysis only within the ROI elements
 			pointsInsideRoi = resultImageRoi.getContainedPoints();
 
 			for (i = 0; i != pointsInsideRoi.length; i++)
@@ -557,7 +565,8 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 				}
 			}
 		}
-		scatterPlot.updateAndDraw();
+//		scatterPlot.updateAndDraw();
+		scatterPlot.draw();
 	}
 
 	public static String analyze(boolean _write_results, boolean _set_roi, String separator)
@@ -1469,7 +1478,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 
 		dlgItems				= gd.getComponents();
 		if(nbChecked <= 5)
-			dlgItems[21]			.setVisible( false );
+			dlgItems[21]		.setVisible( false );
 		gd.pack();
 
 		gd.showDialog();
@@ -1557,26 +1566,39 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 
 	public void imageOpened(ImagePlus imp)			{}
 
-	public void imageUpdated(ImagePlus imp)			{}
+	public void imageUpdated(ImagePlus imp)
+	{
+		if (resultImageSliceNumbers > 1)
+			if (imp == this.resultImage)
+				if(resultImageSlicePosition != this.resultImage.getSlice())
+				{
+					resultImageSlicePosition = this.resultImage.getSlice();
+					image1					.setSlice(resultImageSlicePosition);
+					image2					.setSlice(resultImageSlicePosition);
+					image1Processor			= image1.getProcessor();
+					image2Processor			= image2.getProcessor();
+
+					rebuild_scatter_plot();
+					comparison(false, false);
+				}
+	}
 
 	public void imageClosed(ImagePlus imp)
 	{
-/*
-		if (imp == this.scatterPlot)
+		Roi						.removeRoiListener					(this);
+		ImagePlus				.removeImageListener				(this);
+		if (this.resultImage == null && this.scatterPlot != null)
 		{
-			scatterPlotRoi			.removeRoiListener				(this);
 			scatterPlot.getCanvas()	.removeMouseListener			(this);
 			scatterPlot.getCanvas()	.removeKeyListener				(this);
-			scatterPlotWindow		.removeKeyListener				(this);
+			scatterPlot.getWindow()	.removeKeyListener				(this);
 		}
-		if (imp == this.resultImage)
+		if (this.scatterPlot == null && this.resultImage != null)
 		{
-			resultImageRoi			.removeRoiListener				(this);
 			resultImage.getCanvas()	.removeMouseListener			(this);
 			resultImage.getCanvas()	.removeMouseMotionListener		(this);
-			Prefs.blackBackground	= previousblackBackgroundState;
 		}
-*/
+
 		Prefs.blackBackground	= previousblackBackgroundState;
 	}
 
@@ -1884,8 +1906,13 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		else
 			resultImageRoiName	= resultImage.getRoi().getName();
 
-		return	  resultImage			.getImageStack().getSliceLabel(1)					+ separator
-				+ resultImage			.getImageStack().getSliceLabel(2)					+ separator
+		sstr	= resultImage			.getImageStack().getSliceLabel(1)					+ separator
+				+ resultImage			.getImageStack().getSliceLabel(2)					+ separator;
+
+		if (resultImageSliceNumbers > 1)
+		sstr	+=resultImageSlicePosition													+ separator;
+
+		return	  sstr
 				+ resultImageRoiName														+ separator
 				+ PearsonValueAsString														+ separator
 				+ IJ.d2s			(	xMean										, 8	)	+ separator
@@ -1907,8 +1934,8 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 				+ Integer.toString	((int)	(	maxI1	)								)	+ separator
 				+ Integer.toString	((int)	(	minI2	)								)	+ separator
 				+ Integer.toString	((int)	(	maxI2	)								)	+ separator
-				+ IJ.d2s			(	getMean(lesx) * scatterPlotMax1 / 255	, 5		)	+ separator
-				+ IJ.d2s			(	getMean(lesy) * scatterPlotMax2 / 255	, 5		)	;
+				+ IJ.d2s			(	getMean(lesx) * scatterPlotMax1 / 255		, 5	)	+ separator
+				+ IJ.d2s			(	getMean(lesy) * scatterPlotMax2 / 255		, 5	)	;
 	}
 
 	public void showAbout()
@@ -1916,9 +1943,13 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		String	aboutMessage = 	"Colocalization_finder\n\n" +
 								"Required version:\tImageJ 1.52p01 or higher\n" +
 								"Runing    version:\tImageJ " + IJ.getFullVersion() + "\n\n" +
-								"Version 1.7\n" +
+								"Version 1.8\n" +
 								"\tAuthor\t: Philippe Carl\n" +
 								"\tEmail\t: philippe.carl at unistra dot fr\n" +
+								"\tDate\t: 01/05/2023\n\n" +
+								"\t- The Colocalization_Finder plugin allows the analysis of image stacks\n\n" +
+								"Version 1.7\n" +
+								"\tAuthor\t: Philippe Carl\n" +
 								"\tDate\t: 18/03/2023\n\n" +
 								"\t- Addition of a ScatterPlot_ROI_name column within the Colocalization Finder Results window\n\n" +
 								"Version 1.6\n" +
