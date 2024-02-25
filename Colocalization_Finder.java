@@ -89,6 +89,7 @@ import ij.gui.Overlay;
 import ij.gui.Roi;
 import ij.gui.RoiListener;
 import ij.gui.ShapeRoi;
+import ij.gui.TextRoi;
 import ij.gui.Toolbar;
 
 import ij.measure.CurveFitter;
@@ -454,8 +455,8 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			resultImage			.getImageStack().setSliceLabel		(titles[i2Index]													, 2);
 
 		windowOffset			= 80;
-		ImagePlus				.addImageListener					(this);
 		scatterPlot				= new ImagePlus						("ScatterPlot", new ByteProcessor (scatterPlotSize + windowOffset, scatterPlotSize + windowOffset));
+		scatterPlot				.addImageListener					(this);
 
 		scatterPlot				.show								();
 		scatterPlotWindow		= scatterPlot.getWindow				();
@@ -477,9 +478,17 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		statusLabel				.setBackground						(new Color(220, 220, 220));
 		bottomPanel				.add								(statusLabel);
 		scatterPlotWindow		.add								(bottomPanel);
-		statusLabel				.setPreferredSize					(new Dimension(scatterPlotWindow.getWidth() -  73, statusLabel.getPreferredSize().height));
+
 //		spaceString				= String.format						("%1$" +  Math.round(0.047 * scatterPlotWindow.getWidth() - 20) + "s", " ");
 		spaceString				= String.format						("%1$" +  Math.round(0.039 * scatterPlotWindow.getWidth() - 21) + "s", " ");
+
+		if(scatterPlotSize == 256)
+			statusLabel			.setText							( "min1: "    + Math.round(minI1) +             "  max1: "    + Math.round(maxI1) +             "  min2: "    + Math.round(minI2) +             "  max2: "    + Math.round(maxI2));
+		else
+//			statusLabel			.setText							(" minI1: " + Math.round(minI1) + spaceString + "maxI1: " + Math.round(maxI1) + spaceString + "minI2: " + Math.round(minI2) + spaceString + "maxI2: " + Math.round(maxI2));
+			statusLabel			.setText							(" Pearson: " + IJ.d2s(PearsonValue, precision) + spaceString + "minI1: " + Math.round(minI1) + spaceString + "maxI1: " + Math.round(maxI1) + spaceString + "minI2: " + Math.round(minI2) + spaceString + "maxI2: " + Math.round(maxI2));
+		statusLabel				.setPreferredSize					(new Dimension(scatterPlotWindow.getWidth() - 73, statusLabel.getPreferredSize().height));
+
 		scatterPlotWindow		.pack();
 
 		return true;
@@ -497,19 +506,20 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		{
 			for (x = 0; x < w1; x++)
 			{
-				z1				=                   (int) (image1Processor    .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax1);
-				z2				= scatterPlotSize - (int) (image2Processor    .getPixelValue(x, y) * scatterPlotSize / scatterPlotMax2);
-				count			=                   (int) scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
-				count++;
-				scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
+						z1				=                   (int) ((    image1Processor.getPixelValue(x, y) - scatterPlotMin1) * scatterPlotSize / (scatterPlotMax1 - scatterPlotMin1));
+						z2				= scatterPlotSize - (int) ((    image2Processor.getPixelValue(x, y) - scatterPlotMin2) * scatterPlotSize / (scatterPlotMax2 - scatterPlotMin2));
+						count			=                   (int)  scatterPlotProcessor.getPixelValue(z1 + xOffset, z2 + yOffset);
+						count++;
+						scatterPlotProcessor.putPixelValue(z1 + xOffset, z2 + yOffset, count);
 			}
 		}
-		Roi						.addRoiListener(this);
 //		scatterPlot				.setRoi(new Roi(xOffset + scatterPlotSize + 1 - 150, yOffset, 150, 150));
 		scatterPlot				.setRoi(new Roi(xOffset, yOffset, scatterPlotSize + 1, scatterPlotSize + 1));
 //		scatterPlot				.setRoi(new Roi(xOffset + 20, yOffset, 237, 237));
 		scatterPlotRoi			= scatterPlot.getRoi();
+		scatterPlotRoi			.addRoiListener(this);
 //		resultImageRoi			= resultImage.getRoi();
+//		resultImageRoi			.addRoiListener(this);
 
 		build_plot_for_scatter_plot();
 	}
@@ -762,12 +772,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		maxI1					= (int) ( scatterPlotMin1 + (                  coord.x - xOffset + coord.width  - 1) * (scatterPlotMax1 - scatterPlotMin1) / scatterPlotSize );
 		minI2					= (int) ( scatterPlotMin2 + (scatterPlotSize - coord.y + yOffset - coord.height + 1) * (scatterPlotMax2 - scatterPlotMin2) / scatterPlotSize );
 		maxI2					= (int) ( scatterPlotMin2 + (scatterPlotSize - coord.y + yOffset                   ) * (scatterPlotMax2 - scatterPlotMin2) / scatterPlotSize );
-/*
-		minI1					=                                   coord.x - xOffset;
-		maxI1					=                                   coord.x - xOffset + coord.width  - 1;
-		minI2					=                 scatterPlotSize - coord.y + yOffset - coord.height + 1;
-		maxI2					=                 scatterPlotSize - coord.y + yOffset;
-*/
+
 		if(!IJ.shiftKeyDown())
 		{
 			if(minI1 < scatterPlotMin1 || minI1 > scatterPlotMax1)
@@ -846,12 +851,12 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 				for (x = 0; x < w1; x++)
 				{
 					pos = y * w1 + x;
-//					vi1					= (int) (image1Processor.getPixelValue(x, y) * scatterPlotSize / depth1);
-//					vi2					= (int) (image2Processor.getPixelValue(x, y) * scatterPlotSize / depth2);
-					vi1					= (int) (image1Processor.getPixelValue(x, y) * scatterPlotSize / scatterPlotMax1);
-					vi2					= (int) (image2Processor.getPixelValue(x, y) * scatterPlotSize / scatterPlotMax2);
-					intx[y * w1 + x]	=		 image1Processor.getPixelValue(x, y);
-					inty[y * w1 + x]	=		 image2Processor.getPixelValue(x, y);
+//					vi1					= (int) ( image1Processor.getPixelValue(x, y) * scatterPlotSize / depth1);
+//					vi2					= (int) ( image2Processor.getPixelValue(x, y) * scatterPlotSize / depth2);
+					vi1					= (int) ((image1Processor.getPixelValue(x, y) - scatterPlotMin1) * scatterPlotSize / scatterPlotMax1);
+					vi2					= (int) ((image2Processor.getPixelValue(x, y) - scatterPlotMin2) * scatterPlotSize / scatterPlotMax2);
+					intx[y * w1 + x]	=		  image1Processor.getPixelValue(x, y);
+					inty[y * w1 + x]	=		  image2Processor.getPixelValue(x, y);
 					setMaskPixels();
 				}
 			}
@@ -869,12 +874,12 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 				if(pointsInsideRoi[i].x >= 0 && pointsInsideRoi[i].x < w1 && pointsInsideRoi[i].y >= 0 && pointsInsideRoi[i].y < h1)
 				{
 					pos		= pointsInsideRoi[i].y * w1 + pointsInsideRoi[i].x;
-//					vi1		= (int) (image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / depth1);
-//					vi2		= (int) (image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / depth2);
-					vi1		= (int) (image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / scatterPlotMax1);
-					vi2		= (int) (image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / scatterPlotMax2);
-					intx[i]	=		 image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y);
-					inty[i]	= 		 image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y);
+//					vi1		= (int) ( image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / depth1);
+//					vi2		= (int) ( image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) * scatterPlotSize / depth2);
+					vi1		= (int) ((image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) - scatterPlotMin1) * scatterPlotSize / scatterPlotMax1);
+					vi2		= (int) ((image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y) - scatterPlotMin2) * scatterPlotSize / scatterPlotMax2);
+					intx[i]	=		  image1Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y);
+					inty[i]	= 		  image2Processor.getPixelValue(pointsInsideRoi[i].x, pointsInsideRoi[i].y);
 					setMaskPixels();
 				}
 			}
@@ -1080,21 +1085,21 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		if((show_checked & show_Slope)				!= 0)
 		{
 			if(passed_first)
-				str += String.format("%1$" + size + "s", " ") +	" slope"		+ separator + IJ.d2s(cfParams[1]					, precision);
+				str += String.format("%1$" + size + "s", " ") +	" slope"		+ separator + IJ.d2s(cfParams[1]								, precision);
 			else
 			{
 				passed_first	= true;
-				str +=											" slope"		+ separator + IJ.d2s(cfParams[1]					, precision);
+				str +=											" slope"		+ separator + IJ.d2s(cfParams[1]								, precision);
 			}
 		}
 		if((show_checked & show_Intercept)			!= 0)
 		{
 			if(passed_first)
-				str += String.format("%1$" + size + "s", " ") +	" intercept"	+ separator + IJ.d2s(cfParams[0]					, precision);
+				str += String.format("%1$" + size + "s", " ") +	" intercept"	+ separator + IJ.d2s(cfParams[0]								, precision);
 			else
 			{
 				passed_first	= true;
-				str +=											" intercept"	+ separator + IJ.d2s(cfParams[0]					, precision);
+				str +=											" intercept"	+ separator + IJ.d2s(cfParams[0]								, precision);
 			}
 		}
 		if((show_checked & show_nb_pixels)			!= 0)
@@ -1110,11 +1115,11 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		if((show_checked & show_percentage_pixels)	!= 0)
 		{
 			if(passed_first)
-				str += String.format("%1$" + size + "s", " ") + " %pixels"		+ separator + IJ.d2s(percentPixels				, precision);
+				str += String.format("%1$" + size + "s", " ") + " %pixels"		+ separator + IJ.d2s(percentPixels								, precision);
 			else
 			{
 				passed_first	= true;
-				str +=											" %pixels"		+ separator + IJ.d2s(percentPixels				, precision);
+				str +=											" %pixels"		+ separator + IJ.d2s(percentPixels								, precision);
 			}
 		}
 		if((show_checked & show_min_I1)				!= 0)
@@ -1308,13 +1313,26 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		double  xScale, yScale, xStep, yStep;
 		double v;
 		String str;
+		TextRoi textRoi;
+		Font font;
 
 		scatterPlotProcessor.setColor(255);
 
 		// draw plot legends
-		scatterPlotProcessor.drawString(titles[i1Index], xOffset + (scatterPlotSize - scatterPlotProcessor.getStringWidth(titles[i1Index])) / 2, scatterPlotSize + windowOffset - yOffset + scatterPlotProcessor.getFontMetrics().getHeight());
-		scatterPlotProcessor.drawString(titles[i1Index], xOffset + (scatterPlotSize - scatterPlotProcessor.getStringWidth(titles[i1Index])) / 2, scatterPlotSize + windowOffset - yOffset + scatterPlotProcessor.getFontMetrics().getHeight());
-		                     drawYLabel(titles[i2Index], yOffset, yOffset, scatterPlotSize);
+//		scatterPlot.setOverlay(null);
+		scatterplotOverlay = new Overlay();
+		TextRoi.setAntialiasedText(true);
+		font = new Font("Monospaced", Font.PLAIN, 12);
+
+		textRoi = TextRoi.create(titles[i1Index], xOffset + scatterPlotSize/2, scatterPlotSize + windowOffset - yOffset + scatterPlotProcessor.getFontMetrics().getHeight(), font);
+		textRoi.setStrokeColor(new Color(255, 255, 255));
+		textRoi.setJustification(TextRoi.CENTER);
+		scatterplotOverlay.add(textRoi);
+		textRoi = TextRoi.create(titles[i2Index], scatterPlotProcessor.getStringWidth(titles[i2Index]) / 2 + scatterPlotProcessor.getFontMetrics().getHeight() / 3, scatterPlotSize / 2 + scatterPlotProcessor.getStringWidth(titles[i2Index]) / 2 + yOffset, font);
+		textRoi.setStrokeColor(new Color(255, 255, 255));
+		textRoi.setJustification(TextRoi.CENTER);
+		textRoi.setAngle(90);
+		scatterplotOverlay.add(textRoi);
 
 		// draw plot contour
 		scatterPlotProcessor.drawRect(xOffset - 1, yOffset - 1, scatterPlotSize + 3, scatterPlotSize + 3);
@@ -1335,7 +1353,9 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			scatterPlotProcessor.drawLine(x, y2, x, y2 + tickLength);
 			// X numbers
 			str = IJ.d2s(v, digits);
-			scatterPlotProcessor.drawString(str, x - scatterPlotProcessor.getStringWidth(str) / 2, yOfXAxisNumbers);
+			textRoi = TextRoi.create(str,x - scatterPlotProcessor.getStringWidth(str) / 2, yOfXAxisNumbers, font);
+			textRoi.setStrokeColor(new Color(255,255,255));
+			scatterplotOverlay.add(textRoi);
 		}
 		// X minor ticks
 		xStep	= niceNumber(xStep * 0.19);
@@ -1365,7 +1385,9 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			scatterPlotProcessor.drawLine(x2, y, x2 + tickLength, y);
 			// Y numbers
 			str = IJ.d2s(v, digits);
-			scatterPlotProcessor.drawString(str, LEFT_MARGIN - scatterPlotProcessor.getStringWidth(str), y	+ fontAscent * 2 / 3);
+			textRoi = TextRoi.create(str,LEFT_MARGIN - scatterPlotProcessor.getStringWidth(str), y	+ fontAscent * 2 / 3, font);
+			textRoi.setStrokeColor(new Color(255,255,255));
+			scatterplotOverlay.add(textRoi);
 		}
 
 		// Y minor ticks
@@ -1379,6 +1401,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			scatterPlotProcessor.drawLine(x1, y, x1 - minorTickLength, y);
 			scatterPlotProcessor.drawLine(x2, y, x2 + minorTickLength, y);
 		}
+		scatterPlot.setOverlay(scatterplotOverlay);
 	}
 
 	// Number of digits to display the number n with resolution 'resolution';
@@ -1423,24 +1446,6 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		else                           return  2 * base;
 	}
 
-	// Vertical text for y axis label
-	private static void drawYLabel(String yLabel, int xRight, int yFrameTop, int frameHeight)
-	{
-		if (yLabel.equals(""))
-			return;
-		FontMetrics fm = scatterPlotProcessor.getFontMetrics();
-		int w = scatterPlotProcessor.getStringWidth(yLabel);
-		int h = fm.getHeight();
-		ImageProcessor label = new ByteProcessor(w, h);
-		label.setColor(Color.white);
-		label.drawString(yLabel, 0, h);
-		label = label.rotateLeft();
-		int y2 = yFrameTop + (frameHeight - scatterPlotProcessor.getStringWidth(yLabel)) / 2;
-		if (y2 < yFrameTop)
-			y2 = yFrameTop;
-		int x2 = Math.max(xRight - h, 0);
-		scatterPlotProcessor.insert(label, x2, y2);
-	}
 	/* end methods from ij.gui.Plot */
 
 	private void setScatterPlotRoiSetting()
@@ -1478,7 +1483,7 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 
 		dlgItems				= gd.getComponents();
 		if(nbChecked <= 5)
-			dlgItems[21]		.setVisible( false );
+			dlgItems[21]			.setVisible( false );
 		gd.pack();
 
 		gd.showDialog();
@@ -1585,20 +1590,22 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 
 	public void imageClosed(ImagePlus imp)
 	{
-		Roi						.removeRoiListener					(this);
-		ImagePlus				.removeImageListener				(this);
-		if (this.resultImage == null && this.scatterPlot != null)
+/*
+		if (imp == this.scatterPlot)
 		{
+			scatterPlotRoi			.removeRoiListener				(this);
 			scatterPlot.getCanvas()	.removeMouseListener			(this);
 			scatterPlot.getCanvas()	.removeKeyListener				(this);
-			scatterPlot.getWindow()	.removeKeyListener				(this);
+			scatterPlotWindow		.removeKeyListener				(this);
 		}
-		if (this.scatterPlot == null && this.resultImage != null)
+		if (imp == this.resultImage)
 		{
+			resultImageRoi			.removeRoiListener				(this);
 			resultImage.getCanvas()	.removeMouseListener			(this);
 			resultImage.getCanvas()	.removeMouseMotionListener		(this);
+			Prefs.blackBackground	= previousblackBackgroundState;
 		}
-
+*/
 		Prefs.blackBackground	= previousblackBackgroundState;
 	}
 
