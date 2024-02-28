@@ -86,6 +86,7 @@ import ij.gui.GenericDialog;
 import ij.gui.ImageCanvas;
 import ij.gui.ImageWindow;
 import ij.gui.Overlay;
+import ij.gui.Line;
 import ij.gui.Roi;
 import ij.gui.RoiListener;
 import ij.gui.ShapeRoi;
@@ -1313,7 +1314,9 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		double  xScale, yScale, xStep, yStep;
 		double v;
 		String str;
-		TextRoi textRoi;
+		Line	LineRoi;
+		Roi		RectRoi;
+		TextRoi	textRoi;
 		Font font;
 
 		scatterPlotProcessor.setColor(255);
@@ -1327,34 +1330,49 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		textRoi = TextRoi.create(titles[i1Index], xOffset + scatterPlotSize/2, scatterPlotSize + windowOffset - yOffset + scatterPlotProcessor.getFontMetrics().getHeight(), font);
 		textRoi.setStrokeColor(new Color(255, 255, 255));
 		textRoi.setJustification(TextRoi.CENTER);
+		textRoi.setName("Picture 1 name");
 		scatterplotOverlay.add(textRoi);
 		textRoi = TextRoi.create(titles[i2Index], scatterPlotProcessor.getStringWidth(titles[i2Index]) / 2 + scatterPlotProcessor.getFontMetrics().getHeight() / 3, scatterPlotSize / 2 + scatterPlotProcessor.getStringWidth(titles[i2Index]) / 2 + yOffset, font);
 		textRoi.setStrokeColor(new Color(255, 255, 255));
 		textRoi.setJustification(TextRoi.CENTER);
 		textRoi.setAngle(90);
+		textRoi.setName("Picture 2 name");
 		scatterplotOverlay.add(textRoi);
 
 		// draw plot contour
-		scatterPlotProcessor.drawRect(xOffset - 1, yOffset - 1, scatterPlotSize + 3, scatterPlotSize + 3);
+//		scatterPlotProcessor.drawRect(xOffset - 1, yOffset - 1, scatterPlotSize + 3, scatterPlotSize + 3);
+		RectRoi = Roi.create(xOffset - 1, yOffset - 1, scatterPlotSize + 3, scatterPlotSize + 3);
+		RectRoi.setStrokeColor(new Color(255, 255, 255));
+		RectRoi.setName("Frame border");
+		scatterplotOverlay.add(RectRoi);
 
 		// Along X Axis
-		xScale = scatterPlotSize / (scatterPlotMax1 - scatterPlotMin1);
-		xStep  = Math.abs((scatterPlotMax1 - scatterPlotMin1) * Math.max(1.0 / maxIntervals, (double) MIN_X_GRIDSPACING / scatterPlotSize + 0.06));	// the smallest allowable step
-		xStep  = niceNumber(xStep);
-		i1     = (int) Math.ceil (scatterPlotMin1 / xStep - 1.e-10);
-		i2     = (int) Math.floor(scatterPlotMax1 / xStep + 1.e-10);
-		digits = getDigits(scatterPlotMin1, scatterPlotMax1, xStep, 7);
+		xScale	= scatterPlotSize / (scatterPlotMax1 - scatterPlotMin1);
+		xStep	= Math.abs((scatterPlotMax1 - scatterPlotMin1) * Math.max(1.0 / maxIntervals, (double) MIN_X_GRIDSPACING / scatterPlotSize + 0.06));	// the smallest allowable step
+		xStep	= niceNumber(xStep);
+		i1		= (int) Math.ceil (scatterPlotMin1 / xStep - 1.e-10);
+		i2		= (int) Math.floor(scatterPlotMax1 / xStep + 1.e-10);
+		digits	= getDigits(scatterPlotMin1, scatterPlotMax1, xStep, 7);
 		for (int i = 0; i <= (i2 - i1); i++)
 		{
 			v = (i + i1) * xStep;
 			x = (int) Math.round((v - scatterPlotMin1) * xScale) + xOffset - 1;
 			// X major ticks
-			scatterPlotProcessor.drawLine(x, y1, x, y1 - tickLength);
-			scatterPlotProcessor.drawLine(x, y2, x, y2 + tickLength);
+//			scatterPlotProcessor.drawLine(x, y1, x, y1 - tickLength);
+			LineRoi = Line.create(x, y1, x, y1 - tickLength);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("X major ticks high" + (i + 1));
+			scatterplotOverlay.add(LineRoi);
+//			scatterPlotProcessor.drawLine(x, y2, x, y2 + tickLength);
+			LineRoi = Line.create(x, y2, x, y2 + tickLength);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("X major ticks low"  + (i + 1));
+			scatterplotOverlay.add(LineRoi);
 			// X numbers
 			str = IJ.d2s(v, digits);
 			textRoi = TextRoi.create(str,x - scatterPlotProcessor.getStringWidth(str) / 2, yOfXAxisNumbers, font);
-			textRoi.setStrokeColor(new Color(255,255,255));
+			textRoi.setStrokeColor(new Color(255, 255, 255));
+			textRoi.setName("X numbers labels"   + (i + 1));
 			scatterplotOverlay.add(textRoi);
 		}
 		// X minor ticks
@@ -1365,8 +1383,16 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		{
 			v = i * xStep;
 			x = (int) Math.round((v - scatterPlotMin1) * xScale) + xOffset - 1;
-			scatterPlotProcessor.drawLine(x, y1, x, y1 - minorTickLength);
-			scatterPlotProcessor.drawLine(x, y2, x, y2 + minorTickLength);
+//			scatterPlotProcessor.drawLine(x, y1, x, y1 - minorTickLength);
+			LineRoi = Line.create(x, y1, x, y1 - minorTickLength);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("X minor ticks high" + i);
+			scatterplotOverlay.add(LineRoi);
+//			scatterPlotProcessor.drawLine(x, y2, x, y2 + minorTickLength);
+			LineRoi = Line.create(x, y2, x, y2 + minorTickLength);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("X minor ticks low"  + i);
+			scatterplotOverlay.add(LineRoi);
 		}
 
 		// Along Y Axis
@@ -1381,12 +1407,21 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 			v = yStep == 0 ? scatterPlotMin2 : i * yStep;
 			y = yOffset + scatterPlotSize + 1 - (int) Math.round((v - scatterPlotMin2) * yScale);
 			// Y major ticks
-			scatterPlotProcessor.drawLine(x1, y, x1 - tickLength, y);
-			scatterPlotProcessor.drawLine(x2, y, x2 + tickLength, y);
+//			scatterPlotProcessor.drawLine(x1, y, x1 - tickLength, y);
+			LineRoi = Line.create(x1, y, x1 - tickLength, y);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("Y major ticks high" + i);
+			scatterplotOverlay.add(LineRoi);
+//			scatterPlotProcessor.drawLine(x2, y, x2 + tickLength, y);
+			LineRoi = Line.create(x2, y, x2 + tickLength, y);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("Y major ticks low"  + i);
+			scatterplotOverlay.add(LineRoi);
 			// Y numbers
 			str = IJ.d2s(v, digits);
 			textRoi = TextRoi.create(str,LEFT_MARGIN - scatterPlotProcessor.getStringWidth(str), y	+ fontAscent * 2 / 3, font);
-			textRoi.setStrokeColor(new Color(255,255,255));
+			textRoi.setStrokeColor(new Color(255, 255, 255));
+			textRoi.setName("Y numbers labels"   + i);
 			scatterplotOverlay.add(textRoi);
 		}
 
@@ -1398,8 +1433,16 @@ public class Colocalization_Finder implements	PlugIn, ActionListener, ItemListen
 		{
 			v = i * yStep;
 			y = yOffset + scatterPlotSize + 1 - (int) Math.round((v - scatterPlotMin2) * yScale);
-			scatterPlotProcessor.drawLine(x1, y, x1 - minorTickLength, y);
-			scatterPlotProcessor.drawLine(x2, y, x2 + minorTickLength, y);
+//			scatterPlotProcessor.drawLine(x1, y, x1 - minorTickLength, y);
+			LineRoi = Line.create(x1, y, x1 - minorTickLength, y);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("Y minor ticks high" + i);
+			scatterplotOverlay.add(LineRoi);
+//			scatterPlotProcessor.drawLine(x2, y, x2 + minorTickLength, y);
+			LineRoi = Line.create(x2, y, x2 + minorTickLength, y);
+			LineRoi.setStrokeColor(new Color(255, 255, 255));
+			LineRoi.setName("Y minor ticks low"  + i);
+			scatterplotOverlay.add(LineRoi);
 		}
 		scatterPlot.setOverlay(scatterplotOverlay);
 	}
